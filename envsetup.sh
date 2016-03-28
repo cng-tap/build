@@ -877,7 +877,6 @@ function mm()
         local M=$(findmakefile)
         local MODULES=
         local GET_INSTALL_PATH=
-        local ARGS=
         # Remove the path to top as the makefilepath needs to be relative
         local M=`echo $M|sed 's:'$T'/::'`
         if [ ! "$T" ]; then
@@ -894,12 +893,12 @@ function mm()
             done
             if [ -n "$GET_INSTALL_PATH" ]; then
               MODULES=
-              ARGS=GET-INSTALL-PATH
+              # set all args to 'GET-INSTALL-PATH'
+              set -- GET-INSTALL-PATH
             else
               MODULES=all_modules
-              ARGS=$@
             fi
-            ONE_SHOT_MAKEFILE=$M $DRV make -C $T -f build/core/main.mk $MODULES $ARGS
+            ONE_SHOT_MAKEFILE=$M $DRV make -C $T -f build/core/main.mk $MODULES "$@"
         fi
     fi
 }
@@ -914,8 +913,15 @@ function mmm()
         local ARGS=
         local DIR TO_CHOP
         local GET_INSTALL_PATH=
-        local DASH_ARGS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
-        local DIRS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+
+        if [ "$(__detect_shell)" = "zsh" ]; then
+            set -lA DASH_ARGS $(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
+            set -lA DIRS $(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+        else
+            local DASH_ARGS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
+            local DIRS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+        fi
+
         for DIR in $DIRS ; do
             MODULES=`echo $DIR | sed -n -e 's/.*:\(.*$\)/\1/p' | sed 's/,/ /'`
             if [ "$MODULES" = "" ]; then
@@ -978,8 +984,13 @@ function mmma()
   local T=$(gettop)
   local DRV=$(getdriver $T)
   if [ "$T" ]; then
-    local DASH_ARGS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
-    local DIRS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+    if [ "$(__detect_shell)" = "zsh" ]; then
+        set -lA DASH_ARGS $(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
+        set -lA DIRS $(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+    else
+        local DASH_ARGS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^-.*$/')
+        local DIRS=$(echo "$@" | awk -v RS=" " -v ORS=" " '/^[^-].*$/')
+    fi
     local MY_PWD=`PWD= /bin/pwd`
     if [ "$MY_PWD" = "$T" ]; then
       MY_PWD=
@@ -1833,7 +1844,7 @@ function makerecipe() {
 
   repo forall -c '
 
-  if [ "$REPO_REMOTE" == "github" ]
+  if [ "$REPO_REMOTE" = "github" ]
   then
     pwd
     cmremote
@@ -1844,7 +1855,7 @@ function makerecipe() {
 
 function cmgerrit() {
 
-    if [ "$(__detect_shell)" == "zsh" ]; then
+    if [ "$(__detect_shell)" = "zsh" ]; then
         # zsh does not define FUNCNAME, derive from funcstack
         local FUNCNAME=$funcstack[1]
     fi
@@ -2239,7 +2250,7 @@ function dopush()
         echo "Device Found."
     fi
 
-    if (adb shell getprop ro.aicp.device | grep -q "$AICP_BUILD") || [ "$FORCE_PUSH" == "true" ];
+    if (adb shell getprop ro.aicp.device | grep -q "$AICP_BUILD") || [ "$FORCE_PUSH" = "true" ];
     then
     # retrieve IP and PORT info if we're using a TCP connection
     TCPIPPORT=$(adb devices | egrep '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+[^0-9]+' \
@@ -2405,7 +2416,7 @@ function set_java_home() {
               export JAVA_HOME=$(/usr/libexec/java_home -v 1.7)
               ;;
           *)
-              export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
+              export JAVA_HOME=$(dirname $(dirname $(dirname $(readlink -f $(which java)))))
               ;;
       esac
 
